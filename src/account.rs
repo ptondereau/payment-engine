@@ -91,6 +91,17 @@ impl Account {
         }
         self.wallet.held += amount;
     }
+
+    pub fn unhold(&mut self, amount: Decimal) {
+        if self.locked {
+            panic!()
+        }
+
+        if amount <= Decimal::ZERO {
+            panic!("Only can unhold positive amount")
+        }
+        self.wallet.held -= amount;
+    }
 }
 
 #[cfg(test)]
@@ -156,5 +167,18 @@ mod tests {
     fn account_cannot_hold_funds_with_an_empty_wallet() {
         let mut acc = Account::new(0);
         acc.withdraw(dec!(1.773));
+    }
+
+    #[test]
+    fn account_can_unhold_funds() {
+        let mut acc = Account::new_with_wallet(
+            0,
+            Wallet {
+                amount: dec!(1664),
+                held: dec!(10),
+            },
+        );
+        acc.unhold(dec!(10));
+        assert_eq!(acc.wallet.held, dec!(0));
     }
 }
