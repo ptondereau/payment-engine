@@ -75,6 +75,22 @@ impl Account {
 
         self.wallet.amount -= amount;
     }
+
+    pub fn hold(&mut self, amount: Decimal) {
+        if self.locked {
+            panic!()
+        }
+
+        if amount <= Decimal::ZERO {
+            panic!("Only can hold positive amount")
+        }
+
+        // assuming that you can't hold what you don't have
+        if amount > self.wallet.available_funds() {
+            panic!("Insufficent funds in the wallet")
+        }
+        self.wallet.held += amount;
+    }
 }
 
 #[cfg(test)]
@@ -120,5 +136,25 @@ mod tests {
         let mut acc = Account::new(0);
         acc.withdraw(dec!(1.773));
         assert_eq!(acc.wallet.amount, dec!(1662.227));
+    }
+
+    #[test]
+    fn account_can_hold_funds() {
+        let mut acc = Account::new_with_wallet(
+            0,
+            Wallet {
+                amount: dec!(1664),
+                held: dec!(0),
+            },
+        );
+        acc.hold(dec!(10));
+        assert_eq!(acc.wallet.held, dec!(10));
+    }
+
+    #[test]
+    #[should_panic(expected = "Insufficent funds in the wallet")]
+    fn account_cannot_hold_funds_with_an_empty_wallet() {
+        let mut acc = Account::new(0);
+        acc.withdraw(dec!(1.773));
     }
 }
