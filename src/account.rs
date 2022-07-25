@@ -1,5 +1,7 @@
 use rust_decimal::Decimal;
 
+use crate::errors::AccountOperationError;
+
 pub type AccountId = u16;
 
 /// State of what an account hold of money.
@@ -44,63 +46,77 @@ impl Account {
         }
     }
 
+    fn is_locked(&self) -> Result<(), AccountOperationError> {
+        match self.locked {
+            false => Ok(()),
+            true => Err(AccountOperationError::AccountLocked(self.id)),
+        }
+    }
+
     pub fn get_id(&self) -> AccountId {
         self.id
     }
 
-    pub fn deposit(&mut self, amount: Decimal) {
-        if self.locked {
-            panic!()
+    pub fn deposit(&mut self, amount: Decimal) -> Result<(), AccountOperationError> {
+        self.is_locked()?;
+
+        if Decimal::ZERO >= amount {
+            return Err(AccountOperationError::NonPositiveAmount);
         }
 
-        if amount <= Decimal::ZERO {
-            panic!("Only can deposit positive amount")
-        }
+        self.wallet.amount = self
+            .wallet
+            .amount
+            .checked_add(amount)
+            .ok_or(AccountOperationError::OverflowInWallet)?;
 
-        self.wallet.amount = self.wallet.amount.checked_add(amount).unwrap();
+        Ok(())
     }
 
-    pub fn withdraw(&mut self, amount: Decimal) {
-        if self.locked {
-            panic!()
-        }
+    pub fn withdraw(&mut self, amount: Decimal) -> Result<(), AccountOperationError> {
+        self.is_locked()?;
 
-        if amount <= Decimal::ZERO {
-            panic!("Only can withdraw positive amount")
+        if Decimal::ZERO >= amount {
+            return Err(AccountOperationError::NonPositiveAmount);
         }
 
         if amount > self.wallet.available_funds() {
-            panic!("Insufficent funds in the wallet")
+            return Err(AccountOperationError::InsufficientFunds);
         }
 
         self.wallet.amount -= amount;
+        Ok(())
     }
 
-    pub fn hold(&mut self, amount: Decimal) {
-        if self.locked {
-            panic!()
-        }
+    pub fn hold(&mut self, amount: Decimal) -> Result<(), AccountOperationError> {
+        self.is_locked()?;
 
-        if amount <= Decimal::ZERO {
-            panic!("Only can hold positive amount")
+        if Decimal::ZERO >= amount {
+            return Err(AccountOperationError::NonPositiveAmount);
         }
 
         // assuming that you can't hold what you don't have
         if amount > self.wallet.available_funds() {
-            panic!("Insufficent funds in the wallet")
+            return Err(AccountOperationError::InsufficientFunds);
         }
         self.wallet.held += amount;
+        Ok(())
     }
 
-    pub fn unhold(&mut self, amount: Decimal) {
-        if self.locked {
-            panic!()
+    pub fn unhold(&mut self, amount: Decimal) -> Result<(), AccountOperationError> {
+        self.is_locked()?;
+
+        if Decimal::ZERO >= amount {
+            return Err(AccountOperationError::NonPositiveAmount);
         }
 
-        if amount <= Decimal::ZERO {
-            panic!("Only can unhold positive amount")
+        if amount > self.wallet.held {
+            return Err(AccountOperationError::InsufficientFunds);
         }
+
         self.wallet.held -= amount;
+
+        Ok(())
     }
 }
 
@@ -109,21 +125,24 @@ mod tests {
     use rust_decimal_macros::dec;
 
     use super::*;
+    use crate::errors::AccountOperationError::*;
 
     #[test]
     fn account_can_deposit_funds() {
         let mut acc = Account::new(0);
-        acc.deposit(dec!(1.773));
+        let _ = acc.deposit(dec!(1.773));
         assert_eq!(acc.wallet.amount, dec!(1.773));
-        acc.deposit(dec!(1.664));
+        let _ = acc.deposit(dec!(1.664));
         assert_eq!(acc.wallet.amount, dec!(3.437));
     }
 
     #[test]
-    #[should_panic(expected = "Only can deposit positive amount")]
     fn account_cannot_deposit_negative_funds() {
         let mut acc = Account::new(0);
-        acc.deposit(dec!(-1));
+
+        let expected_error = Err(NonPositiveAmount);
+        let result = acc.deposit(dec!(-1));
+        assert_eq!(result, expected_error);
     }
 
     #[test]
@@ -135,18 +154,18 @@ mod tests {
                 held: dec!(0),
             },
         );
-        acc.withdraw(dec!(1.773));
+        let _ = acc.withdraw(dec!(1.773));
         assert_eq!(acc.wallet.amount, dec!(1662.227));
-        acc.withdraw(dec!(1.664));
+        let _ = acc.withdraw(dec!(1.664));
         assert_eq!(acc.wallet.amount, dec!(1660.563));
     }
 
     #[test]
-    #[should_panic(expected = "Insufficent funds in the wallet")]
-    fn account_cannot_withdraw_funds_with_negative_or_zero_in_its_wallet() {
+    fn account_cannot_withdraw_funds_with_empty_wallet() {
         let mut acc = Account::new(0);
-        acc.withdraw(dec!(1.773));
-        assert_eq!(acc.wallet.amount, dec!(1662.227));
+        let expected_error = Err(InsufficientFunds);
+        let result = acc.withdraw(dec!(1.773));
+        assert_eq!(result, expected_error);
     }
 
     #[test]
@@ -158,15 +177,16 @@ mod tests {
                 held: dec!(0),
             },
         );
-        acc.hold(dec!(10));
+        let _ = acc.hold(dec!(10));
         assert_eq!(acc.wallet.held, dec!(10));
     }
 
     #[test]
-    #[should_panic(expected = "Insufficent funds in the wallet")]
     fn account_cannot_hold_funds_with_an_empty_wallet() {
         let mut acc = Account::new(0);
-        acc.withdraw(dec!(1.773));
+        let expected_error = Err(InsufficientFunds);
+        let result = acc.withdraw(dec!(1.773));
+        assert_eq!(result, expected_error);
     }
 
     #[test]
@@ -178,7 +198,7 @@ mod tests {
                 held: dec!(10),
             },
         );
-        acc.unhold(dec!(10));
+        let _ = acc.unhold(dec!(10));
         assert_eq!(acc.wallet.held, dec!(0));
     }
 }
