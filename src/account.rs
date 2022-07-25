@@ -35,6 +35,15 @@ impl Account {
         }
     }
 
+    #[cfg(test)]
+    pub fn new_with_wallet(id: AccountId, wallet: Wallet) -> Self {
+        Self {
+            id,
+            wallet,
+            locked: false,
+        }
+    }
+
     pub fn get_id(&self) -> AccountId {
         self.id
     }
@@ -49,6 +58,22 @@ impl Account {
         }
 
         self.wallet.amount = self.wallet.amount.checked_add(amount).unwrap();
+    }
+
+    pub fn withdraw(&mut self, amount: Decimal) {
+        if self.locked {
+            panic!()
+        }
+
+        if amount <= Decimal::ZERO {
+            panic!("Only can withdraw positive amount")
+        }
+
+        if amount > self.wallet.available_funds() {
+            panic!("Insufficent funds in the wallet")
+        }
+
+        self.wallet.amount -= amount;
     }
 }
 
@@ -72,5 +97,28 @@ mod tests {
     fn account_cannot_deposit_negative_funds() {
         let mut acc = Account::new(0);
         acc.deposit(dec!(-1));
+    }
+
+    #[test]
+    fn account_can_withdraw_funds() {
+        let mut acc = Account::new_with_wallet(
+            0,
+            Wallet {
+                amount: dec!(1664),
+                held: dec!(0),
+            },
+        );
+        acc.withdraw(dec!(1.773));
+        assert_eq!(acc.wallet.amount, dec!(1662.227));
+        acc.withdraw(dec!(1.664));
+        assert_eq!(acc.wallet.amount, dec!(1660.563));
+    }
+
+    #[test]
+    #[should_panic(expected = "Insufficent funds in the wallet")]
+    fn account_cannot_withdraw_funds_with_negative_or_zero_in_its_wallet() {
+        let mut acc = Account::new(0);
+        acc.withdraw(dec!(1.773));
+        assert_eq!(acc.wallet.amount, dec!(1662.227));
     }
 }
