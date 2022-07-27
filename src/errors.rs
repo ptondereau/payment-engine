@@ -1,5 +1,8 @@
+use std::convert::Infallible;
+
 use crate::account::AccountId;
 use thiserror::Error;
+use tokio::sync::mpsc;
 
 pub type Result<T> = std::result::Result<T, PaymentEngineError>;
 
@@ -18,6 +21,9 @@ pub enum PaymentEngineError {
 
     #[error("CSV reader error: {0}")]
     CSVReaderError(String),
+
+    #[error("TokioMpscError: {0}")]
+    TokioMpscError(String),
 }
 
 impl From<std::io::Error> for PaymentEngineError {
@@ -29,6 +35,21 @@ impl From<std::io::Error> for PaymentEngineError {
 impl From<csv_async::Error> for PaymentEngineError {
     fn from(e: csv_async::Error) -> Self {
         Self::CSVReaderError(format!("{}", e))
+    }
+}
+
+impl<T> From<mpsc::error::SendError<T>> for PaymentEngineError {
+    fn from(e: mpsc::error::SendError<T>) -> Self {
+        Self::TokioMpscError(format!("Error with PaymentsEngineCommand: {}", e))
+    }
+}
+
+impl From<Infallible> for PaymentEngineError {
+    fn from(e: Infallible) -> Self {
+        Self::AccountProcessError(AccountOperationError::InfallibleError(format!(
+            "Infaillible error: {}",
+            e
+        )))
     }
 }
 
@@ -45,4 +66,7 @@ pub enum AccountOperationError {
 
     #[error("Account's wallet has too much money")]
     OverflowInWallet,
+
+    #[error("Infallible error: {0}")]
+    InfallibleError(String),
 }
