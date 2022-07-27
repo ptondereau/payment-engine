@@ -1,5 +1,9 @@
 use payment_engine::errors::{PaymentEngineError, Result};
-use tokio::fs::File;
+use tokio::{
+    fs::File,
+    io::stdout,
+    io::{AsyncWrite, AsyncWriteExt},
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -14,7 +18,25 @@ async fn main() -> Result<()> {
 
     let csv_file = File::open(csv_path).await?;
 
-    println!("file: {:?}", csv_file);
+    let mut stdout = stdout();
+    send_accounts_csv_to_stdout(csv_file, &mut stdout).await?;
+
+    Ok(())
+}
+
+pub async fn send_accounts_csv_to_stdout<T: AsyncWrite + Unpin>(
+    file: File,
+    mut output: T,
+) -> Result<()> {
+    let mut csv_reader = csv_async::AsyncReaderBuilder::new()
+        .trim(csv_async::Trim::All)
+        .flexible(true)
+        .create_reader(file);
+
+    let mut record = csv_async::ByteRecord::new();
+    while csv_reader.read_byte_record(&mut record).await? {
+        output.write_all(record.as_slice()).await?;
+    }
 
     Ok(())
 }

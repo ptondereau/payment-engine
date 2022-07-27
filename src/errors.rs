@@ -15,11 +15,20 @@ pub enum PaymentEngineError {
 
     #[error("Input/Output error: {0}")]
     InputOutpoutError(String),
+
+    #[error("CSV reader error: {0}")]
+    CSVReaderError(String),
 }
 
 impl From<std::io::Error> for PaymentEngineError {
     fn from(e: std::io::Error) -> Self {
         Self::InputOutpoutError(format!("{}", e))
+    }
+}
+
+impl From<csv_async::Error> for PaymentEngineError {
+    fn from(e: csv_async::Error) -> Self {
+        Self::CSVReaderError(format!("{}", e))
     }
 }
 

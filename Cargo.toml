@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+csv-async = {version = "1", features = ["tokio"]}
 rust_decimal = "1"
 thiserror = "1"
-env_logger = "0.9.0"
+env_logger = "0.9"
 tokio = {version = "1.20", features = ["io-std", "fs", "macros", "rt-multi-thread", "sync"] }
 
 [dev-dependencies]
