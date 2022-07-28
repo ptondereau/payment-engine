@@ -19,7 +19,7 @@ pub struct TransactionRecord {
     type_: TransactionRecordType,
     client: AccountId,
     tx: TransactionId,
-    amount: Decimal,
+    amount: Option<Decimal>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,17 +38,16 @@ impl TryInto<PaymentEngineCommand> for TransactionRecord {
     fn try_into(self) -> std::result::Result<PaymentEngineCommand, Self::Error> {
         match self.type_ {
             TransactionRecordType::Deposit => {
-                let tx =
-                    Transaction::new(TransactionKind::Deposit, self.tx, self.client, self.amount);
+                let amount = self.amount.ok_or_else(Self::Error::InvalidAmountFormat)?;
+
+                let tx = Transaction::new(TransactionKind::Deposit, self.tx, self.client, amount);
                 Ok(PaymentEngineCommand::TransactionCommand(tx.into()))
             }
             TransactionRecordType::Withdrawal => {
-                let tx = Transaction::new(
-                    TransactionKind::Withdrawal,
-                    self.tx,
-                    self.client,
-                    self.amount,
-                );
+                let amount = self.amount.ok_or_else(Self::Error::InvalidAmountFormat)?;
+
+                let tx =
+                    Transaction::new(TransactionKind::Withdrawal, self.tx, self.client, amount);
                 Ok(PaymentEngineCommand::TransactionCommand(tx.into()))
             }
             TransactionRecordType::Dispute => {

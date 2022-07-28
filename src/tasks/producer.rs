@@ -20,6 +20,7 @@ impl<R: AsyncRead + Unpin + Send> TransactionProducer<R> {
     pub async fn start(self) -> Result<()> {
         let mut rdr = csv_async::AsyncReaderBuilder::new()
             .trim(csv_async::Trim::All)
+            .flexible(true)
             .create_reader(self.reader);
 
         let headers = rdr.byte_headers().await?.clone();

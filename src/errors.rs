@@ -1,6 +1,9 @@
 use std::convert::Infallible;
 
-use crate::{account::AccountId, transaction::TransactionId};
+use crate::{
+    account::AccountId,
+    transaction::{TransactionId, TransactionKind},
+};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
@@ -24,6 +27,9 @@ pub enum PaymentEngineError {
 
     #[error("TokioMpscError: {0}")]
     TokioMpscError(String),
+
+    #[error("Invalid amount format")]
+    InvalidAmountFormat(),
 }
 
 impl From<std::io::Error> for PaymentEngineError {
@@ -81,4 +87,16 @@ pub enum AccountOperationError {
 
     #[error("Transaction duplicated: {0:?}")]
     DuplicatedTransaction(TransactionId),
+
+    #[error("Transaction with id: {0} not found")]
+    TransactionNotFound(TransactionId),
+
+    #[error("Disputes are not supported for transactions of type '{0}'")]
+    DisputeIsNotDeposit(TransactionKind),
+
+    #[error("Transaction state error: {0} {1}")]
+    TransactionStateMismatch(TransactionId, &'static str),
+
+    #[error("Dispute for transaction {0} not found")]
+    TransactionDisputeNotFound(TransactionId),
 }

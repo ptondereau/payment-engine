@@ -101,8 +101,14 @@ impl PaymentEngine {
         Ok(())
     }
 
-    async fn handle_dispute(&mut self, _cmd: DisputeCommandData) -> Result<()> {
-        unimplemented!()
+    async fn handle_dispute(&mut self, cmd: DisputeCommandData) -> Result<()> {
+        let account_id = cmd.dispute.account_id();
+        let send_cmd = PaymentEngineCommand::DisputeCommand(cmd);
+        match self.account_workers.get(&account_id) {
+            Some(s) => s.send(send_cmd).await?,
+            None => self.create_account_worker(account_id, send_cmd).await?,
+        }
+        Ok(())
     }
 
     pub async fn shutdown(&mut self) {
