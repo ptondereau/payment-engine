@@ -69,4 +69,7 @@ pub enum AccountOperationError {
 
     #[error("Infallible error: {0}")]
     InfallibleError(String),
+
+    #[error("Wrong account id in worker's command: {0} {1}")]
+    WrongAccountId(AccountId, AccountId),
 }

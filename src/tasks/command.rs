@@ -13,7 +13,7 @@ pub enum PaymentEngineCommand {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TransactionCommandData {
-    action: TransactionCommandAction,
+    pub action: TransactionCommandAction,
     pub tx: Transaction,
 }
 
@@ -25,8 +25,8 @@ pub enum TransactionCommandAction {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DisputeCommandData {
-    action: DisputeCommandAction,
-    dispute: Dispute,
+    pub action: DisputeCommandAction,
+    pub dispute: Dispute,
 }
 
 #[derive(Debug, Clone, PartialEq)]

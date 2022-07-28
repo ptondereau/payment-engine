@@ -1,3 +1,5 @@
+use std::fmt::{self, Display, Formatter};
+
 use rust_decimal::Decimal;
 
 use crate::errors::AccountOperationError;
@@ -117,6 +119,21 @@ impl Account {
         self.wallet.held -= amount;
 
         Ok(())
+    }
+}
+
+/// We use this Display impl to output an Account to a csv record.
+impl Display for Account {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        writeln!(
+            f,
+            "{},{},{},{},{}",
+            self.get_id(),
+            self.wallet.available_funds(),
+            self.wallet.held,
+            self.wallet.amount,
+            self.locked
+        )
     }
 }
 
