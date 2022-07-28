@@ -3,9 +3,6 @@
 ## Description
 A payment engine that can process CSV data to produce an account's holder view of its payments.
 
-## Assumption
-- 
-
 ## Technical details
 - The main engine doesn't have a hard complexity thanks to `HashMap`. I've used this to store transaction for an account and also processed account.
 - I've used [MPSC](https://docs.rs/tokio/latest/tokio/sync/mpsc/index.html) from Tokio library to handle efficiency by using channels to process transactions. There are 3 channel engines:
@@ -15,6 +12,7 @@ A payment engine that can process CSV data to produce an account's holder view o
 - Account worker is just a gateway to react to a command and apply business logic to an account.
 - I've used `rust_decimal` to wrap the amount column because it provides some useful error handling and especially to check against overflow when processing `add` operation.
 - I've tried to define explicit error handling in `src/errors.rs` instead of using dynamic one and also in additon to `env_logger`.
+- Dispute/Chargeback's logic is wrapped into a simple state machine: A transaction can have a dispute and this dispute have a state (Open|Cancelled|ChargedBack). This is a method to ensure that every disputed transaction have a resolution. `Cancelled` have a better semantic when a dispute has a bad ending than just `Resolved`.
 
 ## Issues
 - I don't know how to define the right buffer size for all channels. 
