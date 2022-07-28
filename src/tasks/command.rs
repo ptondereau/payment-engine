@@ -29,6 +29,12 @@ pub struct DisputeCommandData {
     pub dispute: Dispute,
 }
 
+impl DisputeCommandData {
+    pub fn new(action: DisputeCommandAction, dispute: Dispute) -> Self {
+        Self { action, dispute }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum DisputeCommandAction {
     OpenDispute,

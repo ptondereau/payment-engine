@@ -53,6 +53,12 @@ impl From<Infallible> for PaymentEngineError {
     }
 }
 
+impl From<tokio::task::JoinError> for PaymentEngineError {
+    fn from(e: tokio::task::JoinError) -> Self {
+        Self::TokioMpscError(format!("{}", e))
+    }
+}
+
 #[derive(Debug, Clone, Error, PartialEq)]
 pub enum AccountOperationError {
     #[error("Insufficient funds in the wallet")]

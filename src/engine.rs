@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct PaymentEngine {
-    _receiver: mpsc::Receiver<PaymentEngineCommand>,
+    pub receiver: mpsc::Receiver<PaymentEngineCommand>,
     account_workers: HashMap<AccountId, mpsc::Sender<PaymentEngineCommand>>,
     worker_joins: Vec<(AccountId, JoinHandle<Result<()>>)>,
     processed_transaction_ids: HashSet<TransactionId>,
@@ -23,7 +23,7 @@ pub struct PaymentEngine {
 impl PaymentEngine {
     pub fn new(receiver: mpsc::Receiver<PaymentEngineCommand>) -> Self {
         Self {
-            _receiver: receiver,
+            receiver,
             account_workers: HashMap::new(),
             worker_joins: Vec::new(),
             processed_transaction_ids: HashSet::new(),
@@ -103,6 +103,21 @@ impl PaymentEngine {
 
     async fn handle_dispute(&mut self, _cmd: DisputeCommandData) -> Result<()> {
         unimplemented!()
+    }
+
+    pub async fn shutdown(&mut self) {
+        self.account_workers = HashMap::new();
+        // Wait until all workers terminate gracefully
+        while let Some((acc_id, join)) = self.worker_joins.pop() {
+            match join.await {
+                Ok(result) => {
+                    if let Err(result_e) = result {
+                        log::error!("Account worker {} tokio task failed: {}", acc_id, result_e);
+                    }
+                }
+                Err(e) => log::error!("await Account worker {} failed: {}", acc_id, e),
+            };
+        }
     }
 }
 
