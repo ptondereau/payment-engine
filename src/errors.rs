@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use crate::account::AccountId;
+use crate::{account::AccountId, transaction::TransactionId};
 use thiserror::Error;
 use tokio::sync::mpsc;
 
@@ -70,6 +70,9 @@ pub enum AccountOperationError {
     #[error("Infallible error: {0}")]
     InfallibleError(String),
 
-    #[error("Wrong account id in worker's command: {0} {1}")]
+    #[error("Wrong account id in worker's command: {0:?} {1:?}")]
     WrongAccountId(AccountId, AccountId),
+
+    #[error("Transaction duplicated: {0:?}")]
+    DuplicatedTransaction(TransactionId),
 }

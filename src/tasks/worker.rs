@@ -1,11 +1,13 @@
 use std::collections::HashMap;
-
 use tokio::sync::mpsc;
 
 use crate::{
     account::Account,
-    errors::{AccountOperationError::WrongAccountId, PaymentEngineError, Result},
-    transaction::{Transaction, TransactionId},
+    errors::{
+        AccountOperationError::{DuplicatedTransaction, WrongAccountId},
+        PaymentEngineError, Result,
+    },
+    transaction::{Transaction, TransactionId, TransactionStatus},
 };
 
 use super::command::{DisputeCommandAction, PaymentEngineCommand, TransactionCommandAction};
@@ -35,8 +37,8 @@ impl AccountWorker {
                 }
 
                 match sub_command.action {
-                    TransactionCommandAction::Deposit => todo!(),
-                    TransactionCommandAction::Withdraw => todo!(),
+                    TransactionCommandAction::Deposit => self.handle_deposit(&sub_command.tx),
+                    TransactionCommandAction::Withdraw => self.handle_withdrawal(&sub_command.tx),
                 }
             }
             PaymentEngineCommand::DisputeCommand(ref sub_command) => {
@@ -61,5 +63,30 @@ impl AccountWorker {
         };
 
         result.map_err(PaymentEngineError::from)
+    }
+
+    pub fn handle_deposit(&mut self, transaction: &Transaction) -> Result<()> {
+        if self.transactions.get(&transaction.id()).is_some() {
+            return Err(DuplicatedTransaction(transaction.id()).into());
+        }
+
+        self.account.deposit(transaction.amount())?;
+        let mut tx = transaction.clone();
+        tx.status = TransactionStatus::Processed;
+        self.transactions.insert(tx.id(), tx);
+
+        Ok(())
+    }
+
+    pub fn handle_withdrawal(&mut self, transaction: &Transaction) -> Result<()> {
+        if self.transactions.get(&transaction.id()).is_some() {
+            return Err(DuplicatedTransaction(transaction.id()).into());
+        }
+
+        self.account.withdraw(transaction.amount())?;
+        let mut tx: Transaction = transaction.clone();
+        tx.status = TransactionStatus::Processed;
+        self.transactions.insert(tx.id(), tx);
+        Ok(())
     }
 }
