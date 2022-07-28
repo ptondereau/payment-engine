@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::{
-    account::Account,
+    account::{Account, AccountId},
     errors::{
         AccountOperationError::{DuplicatedTransaction, WrongAccountId},
         PaymentEngineError, Result,
@@ -13,7 +13,7 @@ use crate::{
 use super::command::{DisputeCommandAction, PaymentEngineCommand, TransactionCommandAction};
 
 pub struct AccountWorker {
-    receiver: mpsc::Receiver<PaymentEngineCommand>,
+    pub receiver: mpsc::Receiver<PaymentEngineCommand>,
     account: Account,
     transactions: HashMap<TransactionId, Transaction>,
 }
@@ -25,6 +25,10 @@ impl AccountWorker {
             account,
             transactions: HashMap::new(),
         }
+    }
+
+    pub fn get_id(&self) -> AccountId {
+        self.account.get_id()
     }
 
     pub async fn handle(&mut self, command: &PaymentEngineCommand) -> Result<()> {

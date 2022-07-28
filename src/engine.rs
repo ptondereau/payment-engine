@@ -3,9 +3,12 @@ use std::collections::{HashMap, HashSet};
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::{
-    account::AccountId,
+    account::{Account, AccountId},
     errors::Result,
-    tasks::command::{DisputeCommandData, PaymentEngineCommand, TransactionCommandData},
+    tasks::{
+        command::{DisputeCommandData, PaymentEngineCommand, TransactionCommandData},
+        worker::AccountWorker,
+    },
     transaction::TransactionId,
 };
 
@@ -75,9 +78,26 @@ impl PaymentEngine {
         account_id: AccountId,
         cmd: PaymentEngineCommand,
     ) -> Result<()> {
-        let (sender, _) = mpsc::channel(32);
+        let (sender, receiver) = mpsc::channel(32);
+        let mut account_worker = AccountWorker::new(receiver, Account::new(account_id));
+        let join = tokio::spawn(async move {
+            while let Some(cmd) = account_worker.receiver.recv().await {
+                // Do not abort worker on command handling errors
+                if let Err(e) = account_worker.handle(&cmd).await {
+                    log::error!(
+                        "AccountWorker with id: {} failed to handle command {:?}: {}",
+                        account_worker.get_id(),
+                        cmd,
+                        e
+                    );
+                };
+            }
+
+            Ok(())
+        });
         sender.send(cmd).await?;
         self.account_workers.insert(account_id, sender);
+        self.worker_joins.push((account_id, join));
         Ok(())
     }
 
