@@ -80,7 +80,7 @@ pub async fn send_accounts_csv_to_stdout<T: AsyncWrite + Unpin>(
         .await?;
 
     while let Some(record) = csv_receiver.recv().await {
-        output.write(record.as_bytes()).await?;
+        output.write_all(record.as_bytes()).await?;
     }
 
     output.flush().await?;
