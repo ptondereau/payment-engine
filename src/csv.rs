@@ -1,11 +1,16 @@
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use tokio::{
-    fs::File,
     io::{AsyncWrite, AsyncWriteExt},
+    sync::mpsc,
 };
 
-use crate::{account::AccountId, errors::Result, transaction::TransactionId};
+use crate::{
+    account::AccountId,
+    errors::{PaymentEngineError, Result},
+    tasks::command::{DisputeCommandAction, DisputeCommandData, PaymentEngineCommand},
+    transaction::{Dispute, Transaction, TransactionId, TransactionKind},
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransactionRecord {
@@ -14,7 +19,7 @@ pub struct TransactionRecord {
     type_: TransactionRecordType,
     client: AccountId,
     tx: TransactionId,
-    amount: Option<Decimal>,
+    amount: Decimal,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -27,23 +32,58 @@ enum TransactionRecordType {
     Chargeback,
 }
 
+impl TryInto<PaymentEngineCommand> for TransactionRecord {
+    type Error = PaymentEngineError;
+
+    fn try_into(self) -> std::result::Result<PaymentEngineCommand, Self::Error> {
+        match self.type_ {
+            TransactionRecordType::Deposit => {
+                let tx =
+                    Transaction::new(TransactionKind::Deposit, self.tx, self.client, self.amount);
+                Ok(PaymentEngineCommand::TransactionCommand(tx.into()))
+            }
+            TransactionRecordType::Withdrawal => {
+                let tx = Transaction::new(
+                    TransactionKind::Withdrawal,
+                    self.tx,
+                    self.client,
+                    self.amount,
+                );
+                Ok(PaymentEngineCommand::TransactionCommand(tx.into()))
+            }
+            TransactionRecordType::Dispute => {
+                let d = Dispute::new(self.client, self.tx);
+                let cmd = DisputeCommandData::new(DisputeCommandAction::OpenDispute, d);
+                Ok(PaymentEngineCommand::DisputeCommand(cmd))
+            }
+            TransactionRecordType::Resolve => {
+                let d = Dispute::new(self.client, self.tx);
+                let cmd = DisputeCommandData::new(DisputeCommandAction::CancelDispute, d);
+                Ok(PaymentEngineCommand::DisputeCommand(cmd))
+            }
+            TransactionRecordType::Chargeback => {
+                let d = Dispute::new(self.client, self.tx);
+                let cmd = DisputeCommandData::new(DisputeCommandAction::ChargebackDispute, d);
+                Ok(PaymentEngineCommand::DisputeCommand(cmd))
+            }
+        }
+    }
+}
+
 pub async fn send_accounts_csv_to_stdout<T: AsyncWrite + Unpin>(
-    file: File,
+    engine_sender: mpsc::Sender<PaymentEngineCommand>,
     mut output: T,
 ) -> Result<()> {
-    let mut csv_reader = csv_async::AsyncReaderBuilder::new()
-        .trim(csv_async::Trim::All)
-        .flexible(true)
-        .create_deserializer(file);
+    let (csv_sender, mut csv_receiver) = mpsc::channel(12);
+    engine_sender
+        .send(PaymentEngineCommand::SendAccountsToCSV(csv_sender))
+        .await?;
 
-    // pop out the headers.
-    let headers = csv_reader.byte_headers().await?.clone();
-    let mut record = csv_async::ByteRecord::new();
-    while csv_reader.read_byte_record(&mut record).await? {
-        let deserialize_record = record.deserialize::<TransactionRecord>(Some(&headers))?;
-
-        output.write_all(record.as_slice()).await?;
+    while let Some(record) = csv_receiver.recv().await {
+        output.write(record.as_bytes()).await?;
     }
+
+    output.flush().await?;
 
     Ok(())
 }
